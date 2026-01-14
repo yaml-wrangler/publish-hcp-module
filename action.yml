@@ -129,9 +129,9 @@ runs:
         MODULE_PATH: ${{ inputs.module_path }}
       run: |
         echo "Creating tarball from $MODULE_PATH..."
-        tar -czf module.tar.gz --exclude='module.tar.gz' -C "$MODULE_PATH" .
+        tar -czf /tmp/module.tar.gz -C "$MODULE_PATH" .
         
         echo "Uploading source code..."
-        curl -s --fail -T module.tar.gz "$UPLOAD_URL"
+        curl -s --fail -T /tmp/module.tar.gz "$UPLOAD_URL"
         
         echo "Upload complete!"

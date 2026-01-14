@@ -52,13 +52,32 @@ runs:
           CREATE_PAYLOAD=$(jq -n \
             --arg name "$NAME" \
             --arg provider "$PROVIDER" \
-            '{data: {type: "registry-modules", attributes: {name: $name, provider: $provider, registry: "private"}}}')
+            '{data: {type: "registry-modules", attributes: {name: $name, provider: $provider, registry_name: "private"}}}')
 
-          curl -s --fail \
+          # Note: The screenshot showed "protocol": "registry", but for private registry creation 
+          # specifically via existing patterns, sometimes "registry_name": "private" is needed or just "registry": "private".
+          # However, following the User's Screenshot STRICTLY:
+          # Screenshot shows: "protocol": "registry"
+          
+          CREATE_PAYLOAD=$(jq -n \
+            --arg name "$NAME" \
+            --arg provider "$PROVIDER" \
+            '{data: {type: "registry-modules", attributes: {name: $name, provider: $provider, protocol: "registry"}}}')
+
+          CREATE_RESPONSE=$(curl -s -w "%{http_code}" -o response.json \
             --header "Authorization: Bearer $HCP_TOKEN" \
             --header "Content-Type: application/vnd.api+json" \
             --data "$CREATE_PAYLOAD" \
-            "https://app.terraform.io/api/v2/organizations/$ORG/registry-modules"
+            "https://app.terraform.io/api/v2/organizations/$ORG/registry-modules")
+            
+          HTTP_CODE=$(tail -n1 <<< "$CREATE_RESPONSE")
+          
+          if [[ "$HTTP_CODE" -ge 400 ]]; then
+            echo "::error::Failed to create module. HTTP $HTTP_CODE"
+            cat response.json
+            exit 1
+          fi
+          echo "Module created successfully."
         elif [[ "$RESPONSE" == "200" ]]; then
           echo "Module already exists."
         else

@@ -1,0 +1,118 @@
+name: 'Publish HCP Module'
+description: 'Publishes a Terraform module to the HCP Private Registry'
+inputs:
+  hcp_token:
+    description: 'HCP API Token'
+    required: true
+  organization:
+    description: 'HCP Organization Name'
+    required: true
+  module_name:
+    description: 'Module Name'
+    required: true
+  module_provider:
+    description: 'Module Provider (e.g., aws, azurerm)'
+    required: true
+  version:
+    description: 'Module Version (e.g., 1.0.0)'
+    required: true
+  module_path:
+    description: 'Path to module root'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate Inputs
+      shell: bash
+      run: |
+        if [[ -z "${{ inputs.hcp_token }}" ]]; then
+          echo "::error::hcp_token is required"
+          exit 1
+        fi
+
+    - name: Create Registry Module
+      shell: bash
+      env:
+        HCP_TOKEN: ${{ inputs.hcp_token }}
+        ORG: ${{ inputs.organization }}
+        NAME: ${{ inputs.module_name }}
+        PROVIDER: ${{ inputs.module_provider }}
+      run: |
+        echo "Check/Create Registry Module: $NAME/$PROVIDER..."
+        
+        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          --header "Authorization: Bearer $HCP_TOKEN" \
+          --header "Content-Type: application/vnd.api+json" \
+          "https://app.terraform.io/api/v2/organizations/$ORG/registry-modules/private/$ORG/$NAME/$PROVIDER")
+          
+        if [[ "$RESPONSE" == "404" ]]; then
+          echo "Module does not exist. Creating..."
+          CREATE_PAYLOAD=$(jq -n \
+            --arg name "$NAME" \
+            --arg provider "$PROVIDER" \
+            '{data: {type: "registry-modules", attributes: {name: $name, provider: $provider, registry: "private"}}}')
+
+          curl -s --fail \
+            --header "Authorization: Bearer $HCP_TOKEN" \
+            --header "Content-Type: application/vnd.api+json" \
+            --data "$CREATE_PAYLOAD" \
+            "https://app.terraform.io/api/v2/organizations/$ORG/registry-modules"
+        elif [[ "$RESPONSE" == "200" ]]; then
+          echo "Module already exists."
+        else
+          echo "::error::Failed to check module existence. HTTP Status: $RESPONSE"
+          exit 1
+        fi
+
+    - name: Create Module Version
+      id: create_version
+      shell: bash
+      env:
+        HCP_TOKEN: ${{ inputs.hcp_token }}
+        ORG: ${{ inputs.organization }}
+        NAME: ${{ inputs.module_name }}
+        PROVIDER: ${{ inputs.module_provider }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        echo "Creating Version $VERSION..."
+        
+        PAYLOAD=$(jq -n \
+            --arg version "$VERSION" \
+            '{data: {type: "registry-module-versions", attributes: {version: $version}}}')
+
+        RESPONSE=$(curl -s \
+          --header "Authorization: Bearer $HCP_TOKEN" \
+          --header "Content-Type: application/vnd.api+json" \
+          --data "$PAYLOAD" \
+          "https://app.terraform.io/api/v2/organizations/$ORG/registry-modules/private/$ORG/$NAME/$PROVIDER/versions")
+
+        # Check for errors in response
+        if echo "$RESPONSE" | jq -e '.errors' > /dev/null; then
+            echo "::error::Failed to create version: $(echo "$RESPONSE" | jq -r '.errors[0].detail')"
+            exit 1
+        fi
+
+        UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.data.links["upload"]')
+        if [[ -z "$UPLOAD_URL" || "$UPLOAD_URL" == "null" ]]; then
+             echo "::error::Failed to get upload URL"
+             echo "Response: $RESPONSE"
+             exit 1
+        fi
+        
+        echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
+
+    - name: Prepare and Upload Source
+      shell: bash
+      env:
+        UPLOAD_URL: ${{ steps.create_version.outputs.upload_url }}
+        MODULE_PATH: ${{ inputs.module_path }}
+      run: |
+        echo "Creating tarball from $MODULE_PATH..."
+        tar -czf module.tar.gz -C "$MODULE_PATH" .
+        
+        echo "Uploading source code..."
+        curl -s --fail -T module.tar.gz "$UPLOAD_URL"
+        
+        echo "Upload complete!"

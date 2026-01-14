@@ -1,0 +1,93 @@
+# ==========================================
+# Terraform .gitignore  
+# Author: Jacob Swanson  
+# Created on  - Date: March 7, 2025 
+# Last Edited - Date: August 14, 2025
+#
+# Changelog: 
+# 08/14/2025: Removed .tflint.hcl from the git ignore so tflint syntax lint was persistent
+# ==========================================  
+
+# ------------------------------------------
+# Terraform Core Files  
+# ------------------------------------------
+
+# Ignore local Terraform working directories  
+**/.terraform/  
+**/.terraform.lock.hcl  
+
+# Ignore Terraform state files (these store the state of your infrastructure)  
+*.tfstate  
+*.tfstate.*  
+*.tfstate.backup  
+
+# Ignore Terraform plan files (these are generated when running `terraform plan -out=tfplan`)  
+*.tfplan  
+
+# Ignore crash log files (generated when Terraform crashes)  
+crash.log  
+
+# ------------------------------------------
+# Terraform Configuration & Overrides  
+# ------------------------------------------
+
+# Ignore Terraform override files (used for local modifications and should not be committed)  
+override.tf  
+override.tf.json  
+*_override.tf  
+*_override.tf.json  
+
+# Ignore Terraform variable files (may contain sensitive data such as passwords, keys, and secrets)
+
+# !!! Commented out because we have normal vars in tfvars we need !!! #
+#*.tfvars  
+#*.tfvars.json  
+
+# Ignore Terraform CLI configuration files (local Terraform settings)  
+.terraformrc  
+terraform.rc  
+
+# ------------------------------------------
+# Provider & Dependency Files  
+# ------------------------------------------
+
+# Ignore Terraform provider-related logs and binaries  
+.terraform-provider-cache/  
+terraform-provider-*  
+
+# Ignore Terraform dependency lock file  
+.terraform.lock.hcl  
+
+# Ignore Terragrunt cache and debug files  
+.terragrunt-cache/  
+terragrunt-debug.log  
+
+# ------------------------------------------
+# Environment & System Files  
+# ------------------------------------------
+
+# Ignore macOS system files  
+.DS_Store  
+
+# Ignore system-specific temp files  
+Thumbs.db  
+desktop.ini  
+
+# Ignore editor and IDE-specific files  
+.vscode/  
+.idea/  
+*.iml  
+
+# ------------------------------------------
+# Pre-commit & Miscellaneous  
+# ------------------------------------------
+
+# Ignore pre-commit configuration (may not be necessary when creating a module from this template)  
+.pre-commit-config.yaml  
+
+# ------------------------------------------
+# Anti-Gravity / Gemini Artifacts
+# ------------------------------------------
+.gemini/
+.antigravity/
+.agent/
